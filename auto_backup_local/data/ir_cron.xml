@@ -1,0 +1,12 @@
+<odoo>
+    <record id="ir_cron_execute_backups" model="ir.cron">
+        <field name="name">Ejecutar backups automáticos</field>
+        <field name="model_id" ref="model_backup_config"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_execute_backups()</field>
+        <field name="interval_type">hours</field>
+        <field name="interval_number">1</field>
+        <field name="numbercall">-1</field>
+        <field name="active">True</field>
+    </record>
+</odoo>

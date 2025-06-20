@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_backup_log_tree" model="ir.ui.view">
+        <field name="name">backup.log.tree</field>
+        <field name="model">backup.log</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="create_date"/>
+                <field name="status"/>
+                <field name="file_path"/>
+                <field name="file_size"/>
+                <field name="message"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_backup_log_form" model="ir.ui.view">
+        <field name="name">backup.log.form</field>
+        <field name="model">backup.log</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="create_date"/>
+                        <field name="status"/>
+                        <field name="file_path"/>
+                        <field name="file_size"/>
+                        <field name="message"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_backup_log" model="ir.actions.act_window">
+        <field name="name">Historial de Backups</field>
+        <field name="res_model">backup.log</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p>Este historial muestra los intentos de ejecución de backups realizados por el sistema.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_backup_log" name="Historial" parent="menu_backup_root" action="action_backup_log"/>
+</odoo>

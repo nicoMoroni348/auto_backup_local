@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_backup_config_form" model="ir.ui.view">
+        <field name="name">backup.config.form</field>
+        <field name="model">backup.config</field>
+        <field name="arch" type="xml">
+            <form string="Configuración de Backups">
+                <sheet>
+                    <group>
+                        <field name="backup_enabled"/>
+                        <field name="backup_path"/>
+                        <field name="frequency"/>
+                        <field name="cleanup_enabled"/>
+                        <field name="retention_days" invisible="not cleanup_enabled"/>
+                        <field name="notes" readonly="1" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_backup_config_tree" model="ir.ui.view">
+        <field name="name">backup.config.tree</field>
+        <field name="model">backup.config</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="backup_path"/>
+                <field name="backup_enabled"/>
+                <field name="frequency"/>
+                <field name="cleanup_enabled"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_backup_config" model="ir.actions.act_window">
+        <field name="name">Configuración de Backups</field>
+        <field name="res_model">backup.config</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p>
+                Define la configuración general del sistema de backups locales.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_backup_root" name="Backups" sequence="20"/>
+    <menuitem id="menu_backup_config" name="Configuración" parent="menu_backup_root" action="action_backup_config"/>
+</odoo>
