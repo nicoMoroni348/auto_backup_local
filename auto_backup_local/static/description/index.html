@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Auto Backup Local - Odoo 17</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body class="p-4">
+
+  <!-- ────────── Header / Hero ────────── -->
+  <div class="text-center mb-5">
+    <h1 class="display-4">Auto Backup Local</h1>
+    <p class="lead">
+      Automated local database backups with fully configurable
+      daily / weekly / monthly retention.<br>
+      <small class="text-muted">(User interface &amp; code comments available in <strong>Spanish</strong>)</small>
+    </p>
+    <img src="icon.png" class="img-fluid rounded shadow mt-3"
+         alt="Auto Backup Local - banner">
+  </div>
+
+  <!-- ────────── Key Features ────────── -->
+  <h2 class="h4 mb-3">Key Features</h2>
+  <ul class="list-group mb-5">
+    <li class="list-group-item">
+      <strong>Flexible scheduling</strong> - daily, weekly, monthly or at multiple
+      fixed hours (e.g. <code>0,5,8,17,21</code>).
+    </li>
+    <li class="list-group-item">
+      <strong>Granular retention policy (G-F-S)</strong><br>
+      &nbsp;&nbsp;• Keep last <em>N</em> daily backups<br>
+      &nbsp;&nbsp;• Keep last <em>N</em> weekly backups<br>
+      &nbsp;&nbsp;• Keep last <em>N</em> monthly backups<br>
+      Set any layer to <code>0</code> to disable it.
+    </li>
+    <li class="list-group-item">
+      <strong>Encrypted master password</strong> - stored with Fernet symmetric encryption.
+    </li>
+    <li class="list-group-item">
+      <strong>Docker-friendly</strong> - simply mount the destination folder as a volume.
+    </li>
+    <li class="list-group-item">
+      <strong>Detailed history</strong> - every attempt is logged (success, warning, error).
+    </li>
+    <li class="list-group-item">
+      <strong>Two cron jobs ready-to-run</strong> - one hourly (backup) &amp; one daily (clean-up).
+    </li>
+    <li class="list-group-item">
+      100 % community - LGPL-3, no external services, no vendor lock-in.
+    </li>
+  </ul>
+
+  <!-- ────────── Screenshots ────────── -->
+  <h2 class="h4 mb-3">Screenshots</h2>
+
+  <div class="row">
+    <div class="col-md-6 mb-4">
+      <img src="screenshot_config.png" class="img-fluid rounded shadow"
+           alt="Configuration form">
+      <p class="mt-2 text-muted text-center">
+        Configuration form with scheduling &amp; retention
+      </p>
+    </div>
+
+    <div class="col-md-6 mb-4">
+      <img src="screenshot_history.png" class="img-fluid rounded shadow"
+           alt="Backup history list">
+      <p class="mt-2 text-muted text-center">
+        Backup history (backup.log)
+      </p>
+    </div>
+  </div>
+
+  <!-- ────────── Installation ────────── -->
+  <h2 class="h4 mb-3">Installation</h2>
+  <ol>
+    <li>
+      Copy the folder <code>auto_backup_local</code> into your custom
+      addons path.
+    </li>
+    <li>
+      Install required Python library:<br>
+      <code>pip install cryptography</code>
+      &nbsp;or&nbsp;
+      <code>pip install -r requirements.txt</code>
+    </li>
+    <li>
+      Add the destination directory as a Docker volume
+      (e.g.&nbsp;<code>/mnt/backups</code>) and give write permissions.
+    </li>
+    <li>
+      Go to <strong>Apps → Update Apps List</strong>, search for
+      <em>Auto Backup Local</em> and click <strong>Install</strong>.
+    </li>
+  </ol>
+
+  <!-- ────────── Usage ────────── -->
+  <h2 class="h4 mb-3">Usage</h2>
+  <ol>
+    <li>Open <strong>Backups → Configuration</strong> and create a record.</li>
+    <li>Set <em>Destination Path</em>, scheduling mode and retention numbers.</li>
+    <li>Enter the Odoo master password (encrypted on save).</li>
+    <li>Check <strong>Backups → History</strong> to monitor results.</li>
+  </ol>
+
+  <!-- ────────── Support / Credits ────────── -->
+  <hr>
+  <p class="text-center small text-muted">
+    © 2025 Nicolás Moroni - Released under LGPL-3.<br>
+    Need help? Contact
+    <a href="mailto:nicolasmoroni003@gmail.com">nicolasmoroni003@gmail.com</a>
+  </p>
+</body>
+</html>
