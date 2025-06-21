@@ -57,7 +57,7 @@ class BackupConfig(models.Model):
             "Lista de horas en formato 0-23 separadas por comas.\n"
             "Ej.: 0,5,8,17,21\n"
             "Esto quiere decir que se ejecutará a las 0,5,8,17,21 hs\n"
-            "Se usa sólo cuando el Modo de programación es «Varias horas fijas»."
+            "Considera que la hora depende de la zona horaria configurada en Odoo"
         )
     )
 
