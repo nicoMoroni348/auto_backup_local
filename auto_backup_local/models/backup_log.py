@@ -23,6 +23,12 @@ class BackupLog(models.Model):
         ondelete="set null",
         index=True,
     )
+    name = fields.Char(
+        string="Descripción",
+        related="config_id.name",
+        store=True,
+        readonly=True,
+    )
 
     # ---------------------------------------------------------------
     #  Datos del evento
