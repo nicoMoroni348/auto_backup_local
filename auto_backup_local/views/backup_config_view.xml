@@ -15,6 +15,14 @@
                         <field name="backup_path" />
                     </group>
 
+                    <!--  Ayuda Docker  -->
+                    <div class="alert alert-info" role="status"
+                        invisible="not backup_enabled">
+                        <span> Si estás ejecutando Odoo en un contenedor Docker, asegúrate de montar
+                            la ruta indicada en <strong>«Ruta de destino»</strong> como volumen
+                            externo. </span>
+                    </div>
+
                     <!--  Programación  -->
                     <group string="Programación">
                         <field name="schedule_mode" />
@@ -50,14 +58,6 @@
                     <group>
                         <field name="last_execution_date" readonly="1" />
                     </group>
-
-                    <!--  Ayuda Docker  -->
-                    <div class="alert alert-info" role="status"
-                        invisible="not backup_enabled">
-                        <span> Si estás ejecutando Odoo en un contenedor Docker, asegúrate de montar
-                            la ruta indicada en <strong>«Ruta de destino»</strong> como volumen
-                            externo. </span>
-                    </div>
                 </sheet>
             </form>
         </field>
