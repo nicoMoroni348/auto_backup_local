@@ -1,45 +1,92 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- ==========================================================
+         LISTA
+         ========================================================== -->
     <record id="view_backup_log_tree" model="ir.ui.view">
         <field name="name">backup.log.tree</field>
         <field name="model">backup.log</field>
         <field name="arch" type="xml">
             <tree>
-                <field name="create_date"/>
-                <field name="status"/>
-                <field name="file_path"/>
-                <field name="file_size"/>
-                <field name="message"/>
+                <field name="create_date" string="Fecha" />
+                <field name="config_id" string="Configuración" />
+                <field name="status" string="Estado"
+                    widget="badge"
+                    decoration-success="status == 'success'"
+                    decoration-warning="status == 'warning'"
+                    decoration-danger="status == 'error'" />
+                <field name="file_path" string="Archivo" />
+                <field name="file_size" string="Tamaño" />
+                <field name="message" string="Mensaje" />
             </tree>
         </field>
     </record>
 
+    <!-- ==========================================================
+         FORMULARIO
+         ========================================================== -->
     <record id="view_backup_log_form" model="ir.ui.view">
         <field name="name">backup.log.form</field>
         <field name="model">backup.log</field>
         <field name="arch" type="xml">
-            <form>
+            <form string="Detalle de Backup">
                 <sheet>
                     <group>
-                        <field name="create_date"/>
-                        <field name="status"/>
-                        <field name="file_path"/>
-                        <field name="file_size"/>
-                        <field name="message"/>
+                        <field name="create_date" readonly="1" />
+                        <field name="config_id" readonly="1" />
+                        <field name="status" readonly="1"
+                            widget="badge"
+                            decoration-success="status == 'success'"
+                            decoration-warning="status == 'warning'"
+                            decoration-danger="status == 'error'" />
+                        <field name="file_path" readonly="1" />
+                        <field name="file_size" readonly="1" />
+                        <field name="message" readonly="1" />
                     </group>
                 </sheet>
             </form>
         </field>
     </record>
 
+    <!-- ==========================================================
+         ACCIÓN
+         ========================================================== -->
     <record id="action_backup_log" model="ir.actions.act_window">
         <field name="name">Historial de Backups</field>
         <field name="res_model">backup.log</field>
         <field name="view_mode">tree,form</field>
+        <field name="context">{}</field>
         <field name="help" type="html">
-            <p>Este historial muestra los intentos de ejecución de backups realizados por el sistema.</p>
+            <p class="o_view_nocontent_smiling_face">
+                Aún no se han registrado copias de seguridad.
+            </p>
+            <p>
+                Cada intento (manual o automático) aparecerá aquí con su resultado y
+                detalle.
+            </p>
         </field>
     </record>
 
-    <menuitem id="menu_backup_log" name="Historial" parent="menu_backup_root" action="action_backup_log"/>
+    <!-- Filtros rápidos -->
+    <record id="backup_log_filter_success" model="ir.ui.view">
+        <field name="name">backup.log.search</field>
+        <field name="model">backup.log</field>
+        <field name="arch" type="xml">
+            <search>
+                <filter name="filter_success" string="Éxito" domain="[('status','=','success')]" />
+                <filter name="filter_warning" string="Warning" domain="[('status','=','warning')]" />
+                <filter name="filter_error" string="Error" domain="[('status','=','error')]" />
+                <separator />
+                <filter name="filter_config" string="Agrupar por configuración"
+                    domain="[]" context="{'group_by':'config_id'}" />
+            </search>
+        </field>
+    </record>
+
+    <!-- Menú -->
+    <menuitem id="menu_backup_log"
+        name="Historial"
+        parent="menu_backup_root"
+        action="action_backup_log"
+        sequence="20" />
 </odoo>
