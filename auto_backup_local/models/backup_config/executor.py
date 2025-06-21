@@ -101,5 +101,7 @@ class BackupConfigExecutor(models.Model):
     def cron_execute_backups(self):
         now = fields.Datetime.now()
         for rec in self.search([("backup_enabled", "=", True)]):
-            if rec._should_execute_now(now):
-                rec.execute_backup()
+            if not rec._should_execute_now(now):
+                _logger.info(f"BackupConfigExecutor: No ejecutar aún backup para {rec.name} ({rec.id})")
+                continue
+            rec.execute_backup()
