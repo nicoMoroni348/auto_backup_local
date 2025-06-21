@@ -28,6 +28,10 @@ G-F-S completamente parametrizable**:
     'license': 'LGPL-3',
     'category': 'Tools',
     'depends': ['base'],
+    "images": [
+        "images/main_screenshot.png",   # thumbnail mostrado en Apps
+    ],
+
 
     'external_dependencies': {
         'python': ['cryptography'],
