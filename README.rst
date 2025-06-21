@@ -1,45 +1,47 @@
-Automatic Local Backup for Odoo 17 (DB + Filestore)
-====================================================
+Auto Backup Local
+=================
+**Versión 17.0.1.0.0 - compatible con Odoo 17 Community & Enterprise**
 
-Este módulo permite realizar backups automáticos de la base de datos y del filestore de Odoo,
-guardándolos en una ruta local configurable, con limpieza automática y logs incluidos.
-Ideal para entornos productivos, especialmente cuando se trabaja con contenedores Docker.
+Este addon automatiza la creación de copias de seguridad de la base de
+datos local y permite definir una política de retención **totalmente
+personalizable** (G-F-S):
 
-Características principales
-----------------------------
+* **Backups** en formato ZIP almacenados en una ruta local.
+* **Programación**:
+  * Diario
+  * Semanal
+  * Mensual
+  * Varias horas fijas (p. ej. 0,5,8,17,21)
+* **Retención paramétrica**
+  * Conservar diarios *N* días
+  * Conservar semanales *N* semanas
+  * Conservar mensuales *N* meses
+  * 0 = desactiva la capa correspondiente
+* **Limpieza automática** - eladdon elimina los archivos que
+  exceden los parámetros de retención, manteniendo siempre el último
+  backup del período.
+* **Cron jobs** listos para usar (definidos en `data/ir.cron.xml`).
 
-* Backups automáticos de base de datos vía API HTTP de Odoo (`/web/database/backup`).
-* Copia del filestore incluido en el ZIP.
-* Configuración de frecuencia y activación desde la interfaz de Odoo.
-* Limpieza automática de backups antiguos:
-  * Diaria: conserva solo el último backup del día anterior.
-  * Semanal: borra todos los días de la semana pasada.
-  * Mensual: conserva solo el último del mes anterior y elimina directorios > 6 meses.
-* Logs detallados de cada acción, accesibles desde Odoo.
-* Compatible con contenedores Docker.
-
-Requisitos
+Instalación
 -----------
+1. Copiar la carpeta ``auto_backup_local`` al directorio de
+   addons personalizados.
+2. Instalar desde *Apps > Actualizar lista > Buscar*
+   **Auto Backup Local**.
+3. Configurar al menos:
+   * Ruta de destino (montada y escribible).
+   * Contraseña maestra de Odoo.
+   * Política de retención deseada.
 
-* Tener instalado `curl` en el contenedor o entorno donde corre Odoo.
-* En caso de usar Docker, se recomienda montar un volumen externo para almacenar los backups:
+Uso
+---
+* **Menú → Backups → Configuración**: crear una o más configuraciones.
+* **Menú → Backups → Historial**: visualizar resultado de cada intento.
 
-  .. code-block:: bash
-
-    docker run -v /home/odoo/backups:/mnt/odoo_backups odoo:17
-
-* El módulo permite indicar `/mnt/odoo_backups` como ruta destino desde la configuración.
-
-Capturas de pantalla
----------------------
-
-(Si querés agregar capturas de configuración o logs desde la interfaz de Odoo, se incluyen aquí)
+Créditos
+--------
+*Desarrollado por Nicolás Moroni.*
 
 Licencia
 --------
-
-Este módulo está licenciado bajo la **GNU Lesser General Public License v3.0 (LGPL-3.0)**
-
-Copyright (C) 2025 - Nicolás Moroni
-
-Colaboraciones y mejoras son bienvenidas mediante Pull Requests.
+LGPL-3.0

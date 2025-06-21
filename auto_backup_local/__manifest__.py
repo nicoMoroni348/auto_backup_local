@@ -2,12 +2,27 @@
 {
     'name': 'Automatic Local Backup',
     'version': '17.0.1.0.0',
-    'summary': 'Backups automáticos en local de la base de datos y filestore con limpieza y logs.',
-    'description': """
-Este módulo permite generar y administrar backups automáticos locales de Odoo.
-Incluye funcionalidades para definir la frecuencia, ruta de almacenamiento,
-retención de backups antiguos y registro de logs. Totalmente compatible con entornos Docker.
-    """,
+    "summary": "Backups automáticos con retención diaria, semanal y mensual configurable",
+    "price": 0,
+    "currency": "EUR",
+    "description": """
+Auto Backup Local (Odoo 17)
+===========================
+
+Módulo que permite programar copias de seguridad locales **con política
+G-F-S completamente parametrizable**:
+
+* Ejecución diaria, semanal, mensual o en horas fijas (ej.: 0,5,8,17,21).
+* Retención:
+  - Conservar diarios *N* días (mantiene el último de cada día).
+  - Conservar semanales *N* semanas (mantiene el último de cada semana ISO).
+  - Conservar mensuales *N* meses (mantiene el último de cada mes).
+* Limpieza automática vía *cron*.
+* Cifrado seguro de la contraseña maestra con Fernet.
+* Validaciones de ruta, permisos y formato de horas.
+* Registro detallado de cada intento en **backup.log**.
+
+""",
     'author': 'Nicolás Moroni',
     'website': 'https://github.com/nicoMoroni348/auto_backup_local',
     'license': 'LGPL-3',
