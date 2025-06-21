@@ -29,7 +29,7 @@ G-F-S completamente parametrizable**:
     'category': 'Tools',
     'depends': ['base'],
     "images": [
-        "images/banner.png",   # thumbnail mostrado en Apps
+        "static/description/banner.png",   # thumbnail mostrado en Apps
     ],
 
 
