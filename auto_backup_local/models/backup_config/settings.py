@@ -21,7 +21,11 @@ from odoo.exceptions import ValidationError  # type: ignore
 from odoo.service import db  # type: ignore
 
 _logger = logging.getLogger(__name__)
+
 _HOUR_RGX = re.compile(r"^(\d|1\d|2[0-3])(,\s*(\d|1\d|2[0-3]))*$")
+_MAX_DAY   = 365     # 1 año
+_MAX_WEEK  = 104     # 2 años
+_MAX_MONTH = 60      # 5 años
 
 
 class BackupConfig(models.Model):
@@ -59,14 +63,14 @@ class BackupConfig(models.Model):
     last_execution_date = fields.Datetime(string="Última ejecución", readonly=True)
 
     # Retención parametrizable
-    cleanup_enabled         = fields.Boolean(string="Limpiar backups", default=True)
+    cleanup_enabled = fields.Boolean(string="Limpiar backups", default=True)
 
-    daily_keep_for_days     = fields.Integer(
+    daily_keep_for_days = fields.Integer(
         string="Conservar diarios (días)",   default=7,
         help="Cantidad de días a conservar los backups diarios. \n"
                 "Ejemplo: 7 días significa que se conservarán los últimos 7 backups diarios antes de ser eliminados."
     )
-    weekly_keep_for_weeks   = fields.Integer(
+    weekly_keep_for_weeks = fields.Integer(
         string="Conservar semanales (sem.)", default=4,
         help="Cantidad de semanas a conservar los backups semanales. \n"
              "Ejemplo: 4 semanas significa que se conservarán los últimos 4 backups semanales antes de ser eliminados."
@@ -78,8 +82,8 @@ class BackupConfig(models.Model):
     )
 
     # Contraseña maestra (cifrada)
-    master_password_input  = fields.Char(string="Contraseña maestra", store=False)
-    master_password_token  = fields.Char(string="Contraseña cifrada", readonly=True, copy=False)
+    master_password_input = fields.Char(string="Contraseña maestra", store=False)
+    master_password_token = fields.Char(string="Contraseña cifrada", readonly=True, copy=False)
 
     # Clave Fernet global
     _KEY_PARAM = "auto_backup_local.fernet_key"
@@ -167,6 +171,58 @@ class BackupConfig(models.Model):
             hours = [int(h.strip()) for h in rec.run_hours.split(",")]
             if len(set(hours)) != len(hours):
                 raise ValidationError(_("Las horas no deben repetirse."))
+
+    @api.constrains(
+        "daily_keep_for_days",
+        "weekly_keep_for_weeks",
+        "monthly_keep_for_months",
+        "cleanup_enabled",
+    )
+    def _check_retention_values(self):
+        """
+        • Valores negativos no permitidos
+        • Valores demasiado grandes -> warning al usuario
+        • Si cleanup_enabled está marcado, al menos un valor > 0
+        """
+        for rec in self:
+            # ---- valores no negativos --------------------------------------
+            if any(v < 0 for v in (
+                rec.daily_keep_for_days,
+                rec.weekly_keep_for_weeks,
+                rec.monthly_keep_for_months,
+            )):
+                raise ValidationError(_(
+                    "Los valores de retención no pueden ser negativos."
+                ))
+
+            # ---- límites superiores razonables ----------------------------
+            if rec.daily_keep_for_days > _MAX_DAY:
+                raise ValidationError(_(
+                    "Conservar diarios más de %s días no es recomendable."
+                ) % _MAX_DAY)
+
+            if rec.weekly_keep_for_weeks > _MAX_WEEK:
+                raise ValidationError(_(
+                    "Conservar semanales más de %s semanas no es recomendable."
+                ) % _MAX_WEEK)
+
+            if rec.monthly_keep_for_months > _MAX_MONTH:
+                raise ValidationError(_(
+                    "Conservar mensuales más de %s meses no es recomendable."
+                ) % _MAX_MONTH)
+
+            # ---- coherencia con checkbox de limpieza ----------------------
+            if rec.cleanup_enabled and all(
+                v == 0 for v in (
+                    rec.daily_keep_for_days,
+                    rec.weekly_keep_for_weeks,
+                    rec.monthly_keep_for_months,
+                )
+            ):
+                raise ValidationError(_(
+                    "Ha activado «Limpiar backups», pero todos los valores de "
+                    "retención están en 0. Indique al menos uno mayor que cero."
+                ))
 
 
     @api.model_create_multi
