@@ -11,32 +11,44 @@
                 <sheet>
                     <!--  Datos generales  -->
                     <group>
-                        <field name="backup_enabled" string="Backups activos" />
-                        <field name="backup_path" string="Ruta de destino" />
-                        <field name="frequency" string="Frecuencia" />
+                        <field name="backup_enabled" />
+                        <field name="backup_path" />
                     </group>
 
-                    <!--  Limpieza automática  -->
-                    <group>
-                        <field name="cleanup_enabled" string="Limpiar backups antiguos" />
-                        <field name="retention_days"
-                            string="Días de retención"
+                    <!--  Programación  -->
+                    <group string="Programación">
+                        <field name="schedule_mode" />
+                        <field name="run_hours"
+                            placeholder="Ej.: 3,13,17,21"
+                            invisible="schedule_mode != 'hours'" />
+                    </group>
+
+                    <!--  Política de retención  -->
+                    <group string="Retención">
+                        <field name="cleanup_enabled" />
+                        <field name="daily_keep_for_days"
+                            invisible="not cleanup_enabled" />
+                        <field name="weekly_keep_for_weeks"
+                            invisible="not cleanup_enabled" />
+                        <field name="monthly_keep_for_months"
                             invisible="not cleanup_enabled" />
                     </group>
+                    <div class="text-muted"
+                        invisible="not cleanup_enabled">
+                        <span>0 = desactivar la capa correspondiente </span>
+                    </div>
 
                     <!--  Autenticación  -->
                     <group string="Autenticación"
                         invisible="not backup_enabled">
                         <field name="master_password_input"
                             password="1"
-                            placeholder="Ingresar contraseña maestra de Odoo" />
+                            placeholder="Contraseña maestra de Odoo" />
                     </group>
 
                     <!--  Metadatos  -->
                     <group>
-                        <field name="last_execution_date"
-                            string="Última ejecución"
-                            readonly="1" />
+                        <field name="last_execution_date" readonly="1" />
                     </group>
 
                     <!--  Ayuda Docker  -->
@@ -60,10 +72,10 @@
         <field name="arch" type="xml">
             <tree string="Configuraciones de Backups"
                 default_order="create_date desc">
-                <field name="backup_path" string="Ruta" />
-                <field name="backup_enabled" string="Activo" />
-                <field name="frequency" string="Frecuencia" />
-                <field name="cleanup_enabled" string="Limpieza" />
+                <field name="backup_path"     string="Ruta"/>
+                <field name="backup_enabled"  string="Activo"/>
+                <field name="schedule_mode"   string="Modo"/>
+                <field name="cleanup_enabled" string="Limpieza"/>
             </tree>
         </field>
     </record>

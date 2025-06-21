@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-backup_config.py  –  Módulo de backups automáticos (Odoo 17)
-"""
 
 from __future__ import annotations
 
@@ -9,8 +6,9 @@ import base64
 import datetime
 import logging
 import os
+import shutil
 import subprocess
-from typing import List
+from typing import List, Set
 
 from cryptography.fernet import Fernet  # type: ignore
 from dateutil.relativedelta import relativedelta  # type: ignore
@@ -20,50 +18,61 @@ from odoo.service import db  # type: ignore
 
 _logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
+# ==============================================================
 #  MODELO PRINCIPAL
-# ---------------------------------------------------------------------------
-
+# ==============================================================
 
 class BackupConfig(models.Model):
     """
-    Configuración de las copias de seguridad automáticas.
+    Modelo principal que define dónde, cuándo y cómo generar/limpiar backups.
     """
     _name = "backup.config"
     _description = "Configuración de backups automáticos"
     _rec_name = "backup_path"
 
-    # ---------------------------------------------------------------------
-    #  Campos
-    # ---------------------------------------------------------------------
-    backup_path = fields.Char(
-        string="Ruta de destino",
-        required=True,
-    )
-    backup_enabled = fields.Boolean(
-        string="Backups activos",
-        default=True,
-    )
-    frequency = fields.Selection(
-        [("daily", "Diario"), ("weekly", "Semanal"), ("monthly", "Mensual")],
-        string="Frecuencia",
+
+    # ------------------------------------------------------------------
+    #  RUTA Y ESTADO
+    # ------------------------------------------------------------------
+    backup_path = fields.Char(string="Ruta de destino", required=True)
+    backup_enabled = fields.Boolean(string="Backups activos", default=True)
+    last_execution_date = fields.Datetime(string="Última ejecución", readonly=True)
+
+    # ------------------------------------------------------------------
+    #  PROGRAMACIÓN CENTRALIZADA
+    # ------------------------------------------------------------------
+    schedule_mode = fields.Selection(
+        [
+            ("daily", "Diario (una vez)"),
+            ("weekly", "Semanal"),
+            ("monthly", "Mensual"),
+            ("hours", "Varias horas fijas"),
+        ],
+        string="Modo de programación",
         default="daily",
         required=True,
     )
-    cleanup_enabled = fields.Boolean(
-        string="Limpiar backups antiguos",
-        default=True,
-    )
-    retention_days = fields.Integer(
-        string="Días de retención",
-        default=7,
-    )
-    last_execution_date = fields.Datetime(
-        string="Última ejecución",
-        readonly=True,
+    run_hours = fields.Char(
+        string="Horas (HH,HH,HH)",
+        help="Sólo para modo «Varias horas fijas». Ej.: 3,13,17,21",
+        invisible="schedule_mode != 'hours'",
     )
 
-    # --------- contraseña maestra ---------------------------------------
+
+    # ------------------------------------------------------------------
+    #  POLÍTICA DE LIMPIEZA
+    # ------------------------------------------------------------------
+    cleanup_enabled = fields.Boolean(string="Limpiar backups antiguos", default=True)
+    retention_days = fields.Integer(string="Días de retención simple", default=7)
+
+    daily_keep_last = fields.Boolean(string="Mantener último backup diario", default=True)
+    weekly_cleanup = fields.Boolean(string="Limpieza semanal", default=True)
+    monthly_cleanup = fields.Boolean(string="Limpieza mensual", default=True)
+    months_to_keep = fields.Integer(string="Meses a conservar", default=6)
+
+    # ------------------------------------------------------------------
+    #  CONTRASEÑA MAESTRA CIFRADA
+    # ------------------------------------------------------------------
     master_password_input = fields.Char(
         string="Contraseña maestra",
         store=False,
@@ -75,9 +84,9 @@ class BackupConfig(models.Model):
         copy=False,
     )
 
-    # ---------------------------------------------------------------------
+    # ==============================================================
     #  Utilidades Fernet (clave en ir.config_parameter)
-    # ---------------------------------------------------------------------
+    # ==============================================================
     _KEY_PARAM = "auto_backup_local.fernet_key"
 
     def _get_fernet(self) -> Fernet:
@@ -91,9 +100,9 @@ class BackupConfig(models.Model):
             _logger.info("Se generó nueva FERNET_KEY y se guardó en ir.config_parameter.")
         return Fernet(key_b64.encode())
 
-    # ---------------------------------------------------------------------
+    # ==============================================================
     #  Validación & cifrado de la master password
-    # ---------------------------------------------------------------------
+    # ==============================================================
     @staticmethod
     def _validate_master(pwd: str) -> None:
         try:
@@ -108,9 +117,9 @@ class BackupConfig(models.Model):
         encrypted = base64.b64decode(token_b64.encode())
         return self._get_fernet().decrypt(encrypted).decode()
 
-    # ---------------------------------------------------------------------
+    # ==============================================================
     #  CRUD overrides
-    # ---------------------------------------------------------------------
+    # ==============================================================
     @api.constrains("backup_path")
     def _check_backup_path(self):
         for rec in self:
@@ -134,9 +143,9 @@ class BackupConfig(models.Model):
             vals["master_password_token"] = self._encrypt_pwd(pwd)
         return super().write(vals)
 
-    # ---------------------------------------------------------------------
+    # ==============================================================
     #  Ejecución de backup
-    # ---------------------------------------------------------------------
+    # ==============================================================
     def execute_backup(self):
         for rec in self.filtered("backup_enabled"):
             if not rec.master_password_token:
@@ -181,30 +190,131 @@ class BackupConfig(models.Model):
             except Exception as exc:
                 rec._create_log("error", _("Excepción durante el backup: %s") % exc)
 
-    # ---------------------------------------------------------------------
+    # ==============================================================
     #  Planificador
-    # ---------------------------------------------------------------------
-    def _should_execute_today(self, now: datetime.datetime) -> bool:
+    # ==============================================================
+    def _parse_run_hours(self) -> Set[int]:
+        hours: Set[int] = set()
+        for token in (self.run_hours or "").split(","):
+            token = token.strip()
+            if token.isdigit():
+                h = int(token)
+                if 0 <= h <= 23:
+                    hours.add(h)
+        return hours
+
+    def _should_execute_now(self, now: datetime.datetime) -> bool:
+        if self.schedule_mode == "hours":
+            hours = self._parse_run_hours()
+            _logger.debug("Horas programadas: %s", hours)
+            _logger.debug("Hora actual: %s", now.hour)
+
+            if not hours or now.hour not in hours:
+                return False
+            # El cron corre cada 1 h; basta con controlar que no haya corrido en esta hora.
+            last = self.last_execution_date
+            return not last or not (last.date() == now.date() and last.hour == now.hour)
+
+        # Modos daily / weekly / monthly
         if not self.last_execution_date:
             return True
         delta = relativedelta(now, self.last_execution_date)
         return (
-            (self.frequency == "daily" and delta.days >= 1) or
-            (self.frequency == "weekly" and delta.days >= 7) or
-            (self.frequency == "monthly" and delta.months >= 1)
+            (self.schedule_mode == "daily" and delta.days >= 1)
+            or (self.schedule_mode == "weekly" and delta.days >= 7)
+            or (self.schedule_mode == "monthly" and delta.months >= 1)
         )
 
+    # ---- cron llamado cada hora ---------------------------------
     @api.model
     def cron_execute_backups(self):
-        _logger.info("Iniciando cron de backups automáticos…")
         now = fields.Datetime.now()
         for rec in self.search([("backup_enabled", "=", True)]):
-            if rec._should_execute_today(now):
+            if rec._should_execute_now(now):
                 rec.execute_backup()
 
-    # ---------------------------------------------------------------------
+
+    # ==============================================================
+    #  Limpieza
+    # ==============================================================
+    def cleanup_backups(self):
+        if not self.cleanup_enabled:
+            return
+
+        base_dir = self.backup_path
+        today = datetime.date.today()
+        log = lambda msg: self._create_log("warning", msg)
+
+        def _iterate_zips(dir_path, prefix):
+            for root, _, files in os.walk(dir_path):
+                for f in files:
+                    if f.startswith(prefix) and f.endswith(".zip"):
+                        yield os.path.join(root, f)
+
+        # Retención simple
+        cutoff_dt = datetime.datetime.now() - datetime.timedelta(days=self.retention_days)
+        for root, _, files in os.walk(base_dir):
+            for f in files:
+                if f.endswith(".zip"):
+                    fp = os.path.join(root, f)
+                    if datetime.datetime.fromtimestamp(os.path.getmtime(fp)) < cutoff_dt:
+                        os.remove(fp)
+        log(_("Aplicada retención simple de %s días.") % self.retention_days)
+
+        # Mantener último backup de ayer
+        if self.daily_keep_last:
+            yest = today - datetime.timedelta(days=1)
+            pat = yest.strftime("db_backup_%Y_%m_%d")
+            ddir = os.path.join(base_dir, yest.strftime("%Y_%m"))
+            if os.path.isdir(ddir):
+                zips = sorted(_iterate_zips(ddir, pat))
+                for z in zips[:-1]:
+                    os.remove(z)
+                log(_("Limpieza diaria aplicada (%s).") % yest.strftime("%Y-%m-%d"))
+
+        # Limpieza semanal (lunes-sábado anteriores)
+        if self.weekly_cleanup:
+            w_start = today - relativedelta(weeks=1, weekday=0)
+            for d in (w_start + datetime.timedelta(i) for i in range(6)):
+                pat = d.strftime("db_backup_%Y_%m_%d")
+                ddir = os.path.join(base_dir, d.strftime("%Y_%m"))
+                if os.path.isdir(ddir):
+                    for z in _iterate_zips(ddir, pat):
+                        os.remove(z)
+            log(_("Limpieza semanal aplicada."))
+
+        # Limpieza mensual
+        if self.monthly_cleanup:
+            prev_last = (today.replace(day=1) - datetime.timedelta(days=1))
+            pdir = os.path.join(base_dir, prev_last.strftime("%Y_%m"))
+            if os.path.isdir(pdir):
+                keep_pat = prev_last.strftime("db_backup_%Y_%m_%d")
+                for z in _iterate_zips(pdir, f"db_backup_{prev_last.strftime('%Y_%m')}"):
+                    if keep_pat not in z:
+                        os.remove(z)
+                log(_("Limpieza mensual aplicada (%s).") % prev_last.strftime("%Y-%m"))
+
+        # Directorios antiguos
+        cutoff_month = today - relativedelta(months=self.months_to_keep)
+        for dname in os.listdir(base_dir):
+            if dname <= cutoff_month.strftime("%Y_%m"):
+                dpath = os.path.join(base_dir, dname)
+                if os.path.isdir(dpath):
+                    shutil.rmtree(dpath)
+                    log(_("Eliminado dir antiguo: %s.") % dpath)
+
+    # ---- cron diario -------------------------------------------
+    @api.model
+    def cron_clean_backups(self):
+        for rec in self.search([("backup_enabled", "=", True)]):
+            rec.cleanup_backups()
+
+
+
+
+    # ==============================================================
     #  Registro de resultados
-    # ---------------------------------------------------------------------
+    # ==============================================================
     def _create_log(self, status: str, message: str, path: str | None = None, size: str | None = None):
         self.env["backup.log"].sudo().create({
             "config_id": self.id,
