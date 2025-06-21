@@ -12,6 +12,7 @@
                     <!--  Datos generales  -->
                     <group>
                         <field name="backup_enabled" />
+                        <field name="name"/>
                         <field name="backup_path" />
                     </group>
 
@@ -72,6 +73,7 @@
         <field name="arch" type="xml">
             <tree string="Configuraciones de Backups"
                 default_order="create_date desc">
+                <field name="name"     string="Descripción"/>
                 <field name="backup_path"     string="Ruta"/>
                 <field name="backup_enabled"  string="Activo"/>
                 <field name="schedule_mode"   string="Modo"/>

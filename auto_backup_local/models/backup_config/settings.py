@@ -37,6 +37,7 @@ class BackupConfig(models.Model):
     #  Campos principales
     # ───────────────────────────────────────────────────────────────
     backup_path = fields.Char(string="Ruta de destino", required=True)
+    name = fields.Char(string="Descripción", required=True)
     backup_enabled = fields.Boolean(string="Backups activos", default=True)
 
     # Programación centralizada
