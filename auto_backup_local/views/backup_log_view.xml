@@ -9,7 +9,7 @@
         <field name="arch" type="xml">
             <tree>
                 <field name="create_date" string="Fecha" />
-                <field name="name" string="Descripción" />
+                <field name="name" optional="hide"/>
                 <field name="config_id" string="Configuración" />
                 <field name="status" string="Estado"
                     widget="badge"
@@ -34,7 +34,7 @@
                 <sheet>
                     <group>
                         <field name="create_date" readonly="1" />
-                        <field name="name" readonly="1" string="Descripción"/>
+                        <field name="name" readonly="1" string="Descripción de la configuración"/>
                         <field name="config_id" readonly="1" />
                         <field name="status" readonly="1"
                             widget="badge"

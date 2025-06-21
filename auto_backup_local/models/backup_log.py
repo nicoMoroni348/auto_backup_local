@@ -24,7 +24,7 @@ class BackupLog(models.Model):
         index=True,
     )
     name = fields.Char(
-        string="Descripción",
+        string="Descripción de la configuración",
         related="config_id.name",
         store=True,
         readonly=True,
