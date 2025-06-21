@@ -49,8 +49,9 @@ class BackupConfig(models.Model):
     run_hours = fields.Char(
         string="Horas (HH,HH,HH)",
         help=(
-            "Lista de horas en formato 0-23 separadas por comas."
-            "Ej.: 0,5,8,17,21"
+            "Lista de horas en formato 0-23 separadas por comas.\n"
+            "Ej.: 0,5,8,17,21\n"
+            "Esto quiere decir que se ejecutará a las 0,5,8,17,21 hs\n"
             "Se usa sólo cuando el Modo de programación es «Varias horas fijas»."
         )
     )
@@ -59,9 +60,22 @@ class BackupConfig(models.Model):
 
     # Retención parametrizable
     cleanup_enabled         = fields.Boolean(string="Limpiar backups", default=True)
-    daily_keep_for_days     = fields.Integer(string="Conservar diarios (días)",   default=7)
-    weekly_keep_for_weeks   = fields.Integer(string="Conservar semanales (sem.)", default=4)
-    monthly_keep_for_months = fields.Integer(string="Conservar mensuales (meses)", default=12)
+
+    daily_keep_for_days     = fields.Integer(
+        string="Conservar diarios (días)",   default=7,
+        help="Cantidad de días a conservar los backups diarios. \n"
+                "Ejemplo: 7 días significa que se conservarán los últimos 7 backups diarios antes de ser eliminados."
+    )
+    weekly_keep_for_weeks   = fields.Integer(
+        string="Conservar semanales (sem.)", default=4,
+        help="Cantidad de semanas a conservar los backups semanales. \n"
+             "Ejemplo: 4 semanas significa que se conservarán los últimos 4 backups semanales antes de ser eliminados."
+    )
+    monthly_keep_for_months = fields.Integer(
+        string="Conservar mensuales (meses)", default=12,
+        help="Cantidad de meses a conservar los backups mensuales. \n"
+             "Ejemplo: 12 meses significa que se conservarán los últimos 12 backups mensuales antes de ser eliminados."
+    )
 
     # Contraseña maestra (cifrada)
     master_password_input  = fields.Char(string="Contraseña maestra", store=False)
