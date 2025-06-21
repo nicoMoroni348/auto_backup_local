@@ -1,48 +1,102 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- ================================================================
+         FORMULARIO DE CONFIGURACIÓN
+         ================================================================= -->
     <record id="view_backup_config_form" model="ir.ui.view">
         <field name="name">backup.config.form</field>
         <field name="model">backup.config</field>
         <field name="arch" type="xml">
             <form string="Configuración de Backups">
                 <sheet>
+                    <!--  Datos generales  -->
                     <group>
-                        <field name="backup_enabled"/>
-                        <field name="backup_path"/>
-                        <field name="frequency"/>
-                        <field name="cleanup_enabled"/>
-                        <field name="retention_days" invisible="not cleanup_enabled"/>
-                        <field name="notes" readonly="1" nolabel="1"/>
+                        <field name="backup_enabled" string="Backups activos" />
+                        <field name="backup_path" string="Ruta de destino" />
+                        <field name="frequency" string="Frecuencia" />
                     </group>
+
+                    <!--  Limpieza automática  -->
+                    <group>
+                        <field name="cleanup_enabled" string="Limpiar backups antiguos" />
+                        <field name="retention_days"
+                            string="Días de retención"
+                            invisible="not cleanup_enabled" />
+                    </group>
+
+                    <!--  Autenticación  -->
+                    <group string="Autenticación"
+                        invisible="not backup_enabled">
+                        <field name="master_password_input"
+                            password="1"
+                            placeholder="Ingresar contraseña maestra de Odoo" />
+                    </group>
+
+                    <!--  Metadatos  -->
+                    <group>
+                        <field name="last_execution_date"
+                            string="Última ejecución"
+                            readonly="1" />
+                    </group>
+
+                    <!--  Ayuda Docker  -->
+                    <div class="alert alert-info" role="status"
+                        invisible="not backup_enabled">
+                        <span> Si estás ejecutando Odoo en un contenedor Docker, asegúrate de montar
+                            la ruta indicada en <strong>«Ruta de destino»</strong> como volumen
+                            externo. </span>
+                    </div>
                 </sheet>
             </form>
         </field>
     </record>
 
+    <!-- ================================================================
+         VISTA LISTA
+         ================================================================= -->
     <record id="view_backup_config_tree" model="ir.ui.view">
         <field name="name">backup.config.tree</field>
         <field name="model">backup.config</field>
         <field name="arch" type="xml">
-            <tree>
-                <field name="backup_path"/>
-                <field name="backup_enabled"/>
-                <field name="frequency"/>
-                <field name="cleanup_enabled"/>
+            <tree string="Configuraciones de Backups"
+                default_order="create_date desc">
+                <field name="backup_path" string="Ruta" />
+                <field name="backup_enabled" string="Activo" />
+                <field name="frequency" string="Frecuencia" />
+                <field name="cleanup_enabled" string="Limpieza" />
             </tree>
         </field>
     </record>
 
+    <!-- ================================================================
+         ACCIÓN
+         ================================================================= -->
     <record id="action_backup_config" model="ir.actions.act_window">
         <field name="name">Configuración de Backups</field>
         <field name="res_model">backup.config</field>
         <field name="view_mode">tree,form</field>
         <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Crea tu primera configuración de backup.
+            </p>
             <p>
-                Define la configuración general del sistema de backups locales.
+                Define la ruta de destino, frecuencia, política de retención y contraseña
+                maestra para las copias de seguridad automáticas.
             </p>
         </field>
     </record>
 
-    <menuitem id="menu_backup_root" name="Backups" sequence="20"/>
-    <menuitem id="menu_backup_config" name="Configuración" parent="menu_backup_root" action="action_backup_config"/>
+    <!-- ================================================================
+         MENÚS
+         ================================================================= -->
+    <menuitem id="menu_backup_root"
+        name="Backups"
+        sequence="20"
+        web_icon="auto_backup_local,static/description/icon.png" />
+
+    <menuitem id="menu_backup_config"
+        name="Configuración"
+        parent="menu_backup_root"
+        action="action_backup_config"
+        sequence="10" />
 </odoo>

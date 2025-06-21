@@ -13,6 +13,11 @@ retención de backups antiguos y registro de logs. Totalmente compatible con ent
     'license': 'LGPL-3',
     'category': 'Tools',
     'depends': ['base'],
+
+    'external_dependencies': {
+        'python': ['cryptography'],
+    },
+
     'data': [
         'security/ir.model.access.csv',
         'data/ir_cron.xml',

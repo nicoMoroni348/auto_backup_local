@@ -1,163 +1,215 @@
 # -*- coding: utf-8 -*-
-from odoo import fields, models, api, _  # type: ignore
+"""
+backup_config.py  –  Módulo de backups automáticos (Odoo 17)
+"""
+
+from __future__ import annotations
+
+import base64
+import datetime
+import logging
 import os
 import subprocess
-import datetime
-from dateutil.relativedelta import relativedelta # type: ignore
+from typing import List
+
+from cryptography.fernet import Fernet  # type: ignore
+from dateutil.relativedelta import relativedelta  # type: ignore
+from odoo import _, api, fields, models  # type: ignore
+from odoo.exceptions import ValidationError  # type: ignore
+from odoo.service import db  # type: ignore
+
+_logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+#  MODELO PRINCIPAL
+# ---------------------------------------------------------------------------
+
 
 class BackupConfig(models.Model):
     """
-    Modelo de configuración general del sistema de backups.
-    Define la ruta, frecuencia, limpieza automática y otras opciones.
+    Configuración de las copias de seguridad automáticas.
     """
     _name = "backup.config"
     _description = "Configuración de backups automáticos"
     _rec_name = "backup_path"
 
+    # ---------------------------------------------------------------------
+    #  Campos
+    # ---------------------------------------------------------------------
     backup_path = fields.Char(
-        string="Ruta de destino del backup",
+        string="Ruta de destino",
         required=True,
-        help="Ruta absoluta donde se guardarán los backups generados. En entornos Docker, esta ruta debe estar montada como volumen."
     )
-
     backup_enabled = fields.Boolean(
-        string="Activar backups automáticos",
+        string="Backups activos",
         default=True,
-        help="Habilita o deshabilita la ejecución automática de backups según la configuración definida."
     )
-
     frequency = fields.Selection(
-        selection=[
-            ("daily", "Diario"),
-            ("weekly", "Semanal"),
-            ("monthly", "Mensual"),
-        ],
-        string="Frecuencia del backup",
+        [("daily", "Diario"), ("weekly", "Semanal"), ("monthly", "Mensual")],
+        string="Frecuencia",
         default="daily",
-        required=True
+        required=True,
     )
-
     cleanup_enabled = fields.Boolean(
-        string="Activar limpieza automática",
+        string="Limpiar backups antiguos",
         default=True,
-        help="Elimina automáticamente backups antiguos según política de retención."
     )
-
     retention_days = fields.Integer(
         string="Días de retención",
         default=7,
-        help="Cantidad de días que se conservarán los backups antes de ser eliminados. Aplica solo si la limpieza está activada."
     )
-
-    notes = fields.Text(
-        string="Advertencia para entornos Docker",
-        readonly=True,
-        default=lambda self: _(
-            "Si estás utilizando Odoo en un contenedor Docker, asegurate de montar la ruta especificada en 'backup_path' como volumen externo del contenedor."
-        )
-    )
-
     last_execution_date = fields.Datetime(
         string="Última ejecución",
-        readonly=True
+        readonly=True,
     )
 
+    # --------- contraseña maestra ---------------------------------------
+    master_password_input = fields.Char(
+        string="Contraseña maestra",
+        store=False,
+        password="1",
+    )
+    master_password_token = fields.Char(
+        string="Contraseña cifrada",
+        readonly=True,
+        copy=False,
+    )
 
+    # ---------------------------------------------------------------------
+    #  Utilidades Fernet (clave en ir.config_parameter)
+    # ---------------------------------------------------------------------
+    _KEY_PARAM = "auto_backup_local.fernet_key"
+
+    def _get_fernet(self) -> Fernet:
+        """Obtiene (o crea) la clave Fernet y retorna un objeto Fernet."""
+        Param = self.env["ir.config_parameter"].sudo()
+        key_b64 = Param.get_param(self._KEY_PARAM)
+        if not key_b64:
+            random_bytes = os.urandom(32)
+            key_b64 = base64.urlsafe_b64encode(random_bytes).decode()
+            Param.set_param(self._KEY_PARAM, key_b64)
+            _logger.info("Se generó nueva FERNET_KEY y se guardó en ir.config_parameter.")
+        return Fernet(key_b64.encode())
+
+    # ---------------------------------------------------------------------
+    #  Validación & cifrado de la master password
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def _validate_master(pwd: str) -> None:
+        try:
+            db.check_super(pwd)
+        except Exception:
+            raise ValidationError(_("La contraseña maestra ingresada no es válida."))
+
+    def _encrypt_pwd(self, clear_pwd: str) -> str:
+        return base64.b64encode(self._get_fernet().encrypt(clear_pwd.encode())).decode()
+
+    def _decrypt_pwd(self, token_b64: str) -> str:
+        encrypted = base64.b64decode(token_b64.encode())
+        return self._get_fernet().decrypt(encrypted).decode()
+
+    # ---------------------------------------------------------------------
+    #  CRUD overrides
+    # ---------------------------------------------------------------------
     @api.constrains("backup_path")
     def _check_backup_path(self):
-        """
-        Verifica que la ruta ingresada sea válida.
-        En entornos reales puede no existir aún, pero debe ser una ruta absoluta válida.
-        """
-        for record in self:
-            if not record.backup_path or not record.backup_path.startswith("/"):
-                raise ValueError(_("La ruta del backup debe ser una ruta absoluta válida del sistema de archivos (ej: /mnt/backups)."))
+        for rec in self:
+            if not rec.backup_path.startswith("/"):
+                raise ValidationError(_("La ruta del backup debe ser absoluta."))
+            os.makedirs(rec.backup_path, exist_ok=True)
 
+    @api.model_create_multi
+    def create(self, vals_list: List[dict]):
+        for vals in vals_list:
+            pwd = vals.pop("master_password_input", False)
+            if pwd:
+                self._validate_master(pwd)
+                vals["master_password_token"] = self._encrypt_pwd(pwd)
+        return super().create(vals_list)
 
+    def write(self, vals):
+        pwd = vals.pop("master_password_input", False)
+        if pwd:
+            self._validate_master(pwd)
+            vals["master_password_token"] = self._encrypt_pwd(pwd)
+        return super().write(vals)
+
+    # ---------------------------------------------------------------------
+    #  Ejecución de backup
+    # ---------------------------------------------------------------------
     def execute_backup(self):
-        """
-        Ejecuta un backup llamando a la API de Odoo con curl.
-        Genera un archivo .zip en la ruta definida en 'backup_path'.
-        Registra éxito o error en backup.log.
-        """
-        for config in self:
-            if not config.backup_enabled:
+        for rec in self.filtered("backup_enabled"):
+            if not rec.master_password_token:
+                rec._create_log("error", _("No hay contraseña maestra configurada."))
+                continue
+            try:
+                master_pwd = rec._decrypt_pwd(rec.master_password_token)
+                self._validate_master(master_pwd)
+            except Exception as exc:
+                rec._create_log("error", _("Error al validar contraseña: %s") % exc)
                 continue
 
             db_name = self.env.cr.dbname
-            master_pwd = self.env["ir.config_parameter"].sudo().get_param("admin_passwd")
-            if not master_pwd:
-                config._create_log("error", "Contraseña maestra no definida en admin_passwd.")
-                continue
-
             now = datetime.datetime.now()
-            date_str = now.strftime("%Y_%m_%d_%H%M%S")
-            filename = f"db_backup_{db_name}_{date_str}.zip"
-            output_dir = config.backup_path.rstrip("/")
-            filepath = f"{output_dir}/{filename}"
+            filename = f"db_backup_{db_name}_{now.strftime('%Y_%m_%d_%H%M%S')}.zip"
+            filepath = os.path.join(rec.backup_path, filename)
 
-            curl_command = [
-                "curl", "-X", "POST",
+            curl_cmd = [
+                "curl", "--silent", "--fail", "--show-error",
+                "-X", "POST",
                 "-F", f"master_pwd={master_pwd}",
                 "-F", f"name={db_name}",
                 "-F", "backup_format=zip",
                 "-o", filepath,
-                "http://localhost:8069/web/database/backup"
+                "http://localhost:8069/web/database/backup",
             ]
 
             try:
-                result = subprocess.run(curl_command, capture_output=True, text=True, timeout=120)
-                if result.returncode != 0:
-                    config._create_log("error", f"Fallo de ejecución CURL: {result.stderr}")
+                res = subprocess.run(curl_cmd, capture_output=True, text=True, timeout=120)
+                if res.returncode != 0:
+                    rec._create_log("error", _("Fallo CURL: %s") % res.stderr.strip())
                     continue
 
                 if not os.path.isfile(filepath):
-                    config._create_log("error", f"Archivo no generado: {filepath}")
+                    rec._create_log("error", _("No se generó el archivo esperado."))
                     continue
 
-                size = os.path.getsize(filepath)
-                size_mb = f"{round(size / (1024 * 1024), 2)} MB"
-                config._create_log("success", "Backup generado correctamente.", filepath, size_mb)
+                size_mb = f"{round(os.path.getsize(filepath)/1024**2, 2)} MB"
+                rec._create_log("success", _("Backup generado correctamente."), filepath, size_mb)
+                rec.last_execution_date = fields.Datetime.now()
 
-            except Exception as e:
-                config._create_log("error", f"Excepción durante el backup: {str(e)}")
+            except Exception as exc:
+                rec._create_log("error", _("Excepción durante el backup: %s") % exc)
 
-    def _create_log(self, status, message, path=None, size=None):
-        self.env["backup.log"].create({
+    # ---------------------------------------------------------------------
+    #  Planificador
+    # ---------------------------------------------------------------------
+    def _should_execute_today(self, now: datetime.datetime) -> bool:
+        if not self.last_execution_date:
+            return True
+        delta = relativedelta(now, self.last_execution_date)
+        return (
+            (self.frequency == "daily" and delta.days >= 1) or
+            (self.frequency == "weekly" and delta.days >= 7) or
+            (self.frequency == "monthly" and delta.months >= 1)
+        )
+
+    @api.model
+    def cron_execute_backups(self):
+        _logger.info("Iniciando cron de backups automáticos…")
+        now = fields.Datetime.now()
+        for rec in self.search([("backup_enabled", "=", True)]):
+            if rec._should_execute_today(now):
+                rec.execute_backup()
+
+    # ---------------------------------------------------------------------
+    #  Registro de resultados
+    # ---------------------------------------------------------------------
+    def _create_log(self, status: str, message: str, path: str | None = None, size: str | None = None):
+        self.env["backup.log"].sudo().create({
             "config_id": self.id,
             "status": status,
             "message": message,
             "file_path": path,
             "file_size": size,
         })
-
-
-    def _should_execute_today(self, now):
-        """
-        Determina si se debe ejecutar el backup hoy, en función de la frecuencia.
-        """
-        for rec in self:
-            if not rec.last_execution_date:
-                return True  # Nunca ejecutado
-
-            delta = relativedelta(now, rec.last_execution_date)
-            if rec.frequency == "daily":
-                return delta.days >= 1
-            elif rec.frequency == "weekly":
-                return delta.days >= 7
-            elif rec.frequency == "monthly":
-                return delta.months >= 1
-        return False
-
-    @api.model
-    def cron_execute_backups(self):
-        """
-        Método ejecutado por el cron. Recorre todas las configuraciones activas
-        y ejecuta el backup si corresponde por frecuencia.
-        """
-        now = fields.Datetime.now()
-        configs = self.search([("backup_enabled", "=", True)])
-        for config in configs:
-            if config._should_execute_today(now):
-                config.execute_backup()
-                config.last_execution_date = now
