@@ -11,6 +11,8 @@ from __future__ import annotations
 import base64
 import logging
 import os
+import re
+
 from typing import List
 
 from cryptography.fernet import Fernet  # type: ignore
@@ -19,6 +21,7 @@ from odoo.exceptions import ValidationError  # type: ignore
 from odoo.service import db  # type: ignore
 
 _logger = logging.getLogger(__name__)
+_HOUR_RGX = re.compile(r"^(\d|1\d|2[0-3])(,\s*(\d|1\d|2[0-3]))*$")
 
 
 class BackupConfig(models.Model):
@@ -45,9 +48,13 @@ class BackupConfig(models.Model):
     )
     run_hours = fields.Char(
         string="Horas (HH,HH,HH)",
-        help="Ej.: 3,13,17,21  (sólo válido en modo «Varias horas fijas»)",
-        invisible="schedule_mode != 'hours'",
+        help=(
+            "Lista de horas en formato 0-23 separadas por comas."
+            "Ej.: 0,5,8,17,21"
+            "Se usa sólo cuando el Modo de programación es «Varias horas fijas»."
+        )
     )
+
     last_execution_date = fields.Datetime(string="Última ejecución", readonly=True)
 
     # Retención parametrizable
@@ -121,6 +128,32 @@ class BackupConfig(models.Model):
                     "Odoo no tiene permisos de escritura en '%s'. "
                     "Cambie la ruta o ajuste los permisos (chown / chmod)."
                 ) % path)
+
+    @api.constrains("run_hours", "schedule_mode")
+    def _check_run_hours(self):
+        """
+        • Sólo se valida cuando schedule_mode == 'hours'.
+        • Formato permitido: números 0-23 separados por coma.
+        • No se permiten duplicados.
+        """
+        for rec in self:
+            if rec.schedule_mode != "hours":
+                continue
+
+            if not rec.run_hours:
+                raise ValidationError(_("Debe indicar al menos una hora."))
+
+            if not _HOUR_RGX.match(rec.run_hours.strip()):
+                raise ValidationError(_(
+                    "Formato de horas no válido. Use números 0-23 separados por comas, "
+                    "por ejemplo: 0,5,8,17,21"
+                ))
+
+            # verificar duplicados
+            hours = [int(h.strip()) for h in rec.run_hours.split(",")]
+            if len(set(hours)) != len(hours):
+                raise ValidationError(_("Las horas no deben repetirse."))
+
 
     @api.model_create_multi
     def create(self, vals_list: List[dict]):
